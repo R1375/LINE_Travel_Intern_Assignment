@@ -10,9 +10,11 @@ import {
   ParseIntPipe, 
   HttpException, 
   HttpStatus,
-  Logger
+  Logger,
+  BadRequestException
  } from '@nestjs/common';
  import { FileInterceptor } from '@nestjs/platform-express';
+ import { memoryStorage } from 'multer';
  import { HotelsService } from './hotels.service';
  import { CreateHotelDto } from './dto/create-hotel.dto';
  import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -34,66 +36,28 @@ import {
   @Post()
   @ApiOperation({ summary: 'Create a new hotel' })
   create(@Body() createHotelDto: CreateHotelDto) {
+    
     return this.hotelsService.create(createHotelDto);
   }
  
   @Post('upload')
-  @ApiOperation({ summary: 'Import hotels from CSV file' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description: 'CSV file containing hotel data',
-        },
-      },
-    },
-  })
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 5242880 }, // 5MB
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }
     })
   )
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    this.logger.debug('Upload request received');
-    this.logger.debug('File metadata:', {
-      fieldname: file?.fieldname,
-      originalname: file?.originalname,
-      mimetype: file?.mimetype,
-      size: file?.size,
-      buffer: file?.buffer?.length
-    });
- 
-    if (!file?.buffer) {
-      this.logger.error('No file provided in request');
-      throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
+    console.log('File received:', file?.originalname);
+    
+    if (!file) {
+      throw new BadRequestException('No file provided');
     }
- 
-    try {
-      const result = await this.hotelsService.importCSV(file.buffer);
-      this.logger.log('File processed successfully');
-      return { 
-        message: 'File uploaded and processed successfully',
-        filename: file.originalname,
-        recordsProcessed: Array.isArray(result) ? result.length : 0
-      };
-    } catch (error) {
-      this.logger.error('Error processing file:', error);
-      throw new HttpException(
-        error.message || 'Failed to process file',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    
+    return this.hotelsService.importCSV(file.buffer);
   }
- 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get hotel by id' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.hotelsService.findOne(id);
-  }
+
+  
  
   @Put(':id')
   @ApiOperation({ summary: 'Update hotel information' })

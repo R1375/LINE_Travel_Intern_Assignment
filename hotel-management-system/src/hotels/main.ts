@@ -5,12 +5,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   try {
+
+    
     const logger = new Logger('Bootstrap');
     const app = await NestFactory.create(AppModule);
-    
-    // Enable validation
+  
     app.useGlobalPipes(new ValidationPipe());
-    
+    app.use('/hotels/upload', (req, res, next) => {
+      console.log('Request received at upload endpoint');
+      next();
+    });
+    app.enableCors();  
     // Swagger setup
     const config = new DocumentBuilder()
       .setTitle('Hotel Management API')
